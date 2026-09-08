@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__visualize__show_widget",
+      "Bash(node -e ' *)",
+      "Bash(node --check apps-script.gs)",
+      "PowerShell($base = \"C:\\\\Users\\\\LENOVO\\\\Documents\\\\EXAEL-AMVM\\\\EXAEL-AMVM\"; foreach \\($d in \"fuentes\\\\diario\",\"fuentes\\\\articulos\",\"fuentes\\\\notas\",\"wiki\\\\entidades\",\"wiki\\\\temas\",\"wiki\\\\fuentes\",\"wiki\\\\analisis\"\\) { New-Item -ItemType Directory -Force \\(Join-Path $base $d\\) | Out-Null }; Get-ChildItem -Recurse $base -Directory | Select-Object FullName)",
+      "mcp__mcp-registry__search_mcp_registry",
+      "PowerShell($url = 'https://script.google.com/macros/s/AKfycbzL_WsxJYUiXPULKFVPdy_fFDiyw_10P8Bqxw2GPnV-FwmJiuzLdAZVWuhg3MsLwRyJEA/exec'; $r = Invoke-RestMethod -Uri \"$url`?action=admin_list\" -Method Get -TimeoutSec 45; $r | ConvertTo-Json -Depth 6 -Compress)",
+      "PowerShell($plug = \"C:\\\\Users\\\\LENOVO\\\\Documents\\\\EXAEL-AMVM\\\\EXAEL-AMVM\\\\.obsidian\\\\plugins\\\\obsidian-importer\"; New-Item -ItemType Directory -Force $plug | Out-Null; $api = Invoke-RestMethod 'https://api.github.com/repos/obsidianmd/obsidian-importer/releases/latest'; $api.tag_name; foreach \\($a in $api.assets\\) { if \\($a.name -in 'main.js','manifest.json','styles.css'\\) { Invoke-WebRequest -Uri $a.browser_download_url -OutFile \\(Join-Path $plug $a.name\\) } }; Get-ChildItem $plug | Select-Object Name, Length)"
+    ]
+  }
+}
