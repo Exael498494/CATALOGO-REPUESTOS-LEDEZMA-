@@ -60,6 +60,12 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.95);backdrop-
   font-weight:700;font-size:.88rem;cursor:pointer;transition:background .2s;white-space:nowrap}
 .search-btn:hover{background:var(--red-dark)}
 
+/* TIPO DE CAMBIO (solo lectura; se edita desde el Admin) */
+.fx-rate{display:inline-flex;align-items:center;gap:.5rem;background:#fff;border:1px solid var(--red);
+  border-radius:6px;padding:.6rem 1.1rem;box-shadow:0 0 0 3px var(--red-glow);flex-shrink:0}
+.fx-icon{font-size:1.05rem;line-height:1}
+.fx-value{font-family:var(--mono);font-size:.92rem;color:var(--red);font-weight:800;letter-spacing:.02em}
+
 /* FILTERS */
 .filters{display:flex;gap:.45rem;overflow-x:auto;padding:1.4rem 2rem; justify-content: center;
   border-bottom:1px solid var(--border);scrollbar-width:none; background: var(--surface);}
@@ -219,6 +225,10 @@ footer p{color:var(--muted);font-size:.8rem; margin-top: 1rem;}
   <div class="search-wrap">
     <input class="search-input" id="searchInput" type="text" placeholder="Buscar repuesto, código, medida…">
     <button class="search-btn" onclick="filterSearch()">🔍 Buscar</button>
+    <div class="fx-rate" id="fxRate" style="display:none" title="Tipo de cambio de referencia (se edita desde el Admin)">
+      <span class="fx-icon">💵</span>
+      <span class="fx-value" id="fxValue"></span>
+    </div>
   </div>
 </section>
 
@@ -489,6 +499,20 @@ function mostrarToast(msg){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
 }
 
+// ─── TIPO DE CAMBIO (se configura desde el Admin, llega junto con los
+// productos en cada sincronizacion; el catalogo solo lo muestra) ─────────────
+function renderTipoCambio(valor){
+  const box = document.getElementById('fxRate');
+  const el = document.getElementById('fxValue');
+  const value = Number(valor);
+  if(!Number.isFinite(value) || value <= 0){
+    box.style.display = 'none';
+    return;
+  }
+  el.textContent = `TC- 1 USD = ${value.toFixed(2)} BS`;
+  box.style.display = 'inline-flex';
+}
+
 // ─── MOTOR DINAMICO GOOGLE SHEETS ────────────────────────────────────────────
 function text(v,fallback=''){return String(v ?? fallback).trim()}
 function number(v,fallback=0){const n=Number(String(v ?? '').replace(',','.'));return Number.isFinite(n)?n:fallback}
@@ -676,6 +700,7 @@ async function loadProductsFromSheets(){
     syncCartWithCatalog();
     renderFilterTabs();
     renderProducts();
+    renderTipoCambio(data.tipo_cambio);
     setSyncStatus(`Sincronizado con Google Sheets: ${new Date().toLocaleTimeString('es-BO')}`);
   }catch(error){
     console.error(error);

@@ -32,6 +32,11 @@ const ADMIN_TOKEN = '';
 const CACHE_PREFIX = 'ncs_products_v2_';
 const CACHE_TTL_SECONDS = 8; // tiempo que se reutiliza la lista publica antes de releer la hoja
 
+// Clave usada en PropertiesService para guardar el tipo de cambio USD -> BOB
+// que se edita desde el Admin y se muestra en el catalogo (recuadro "TC").
+// No vive en la hoja de productos porque es un solo valor global, no una fila.
+const TC_PROPERTY_KEY = 'tipo_cambio_usd_bob';
+
 // ─── AUTOMATIZACIONES ────────────────────────────────────────────────────────
 // Correo donde llegan las alertas de stock, el reporte diario y los avisos de
 // pedidos nuevos. Cambialo si quieres recibirlos en otra cuenta.
@@ -72,8 +77,8 @@ function doGet(e) {
   const params = e.parameter || {};
   const action = (params.action || 'list').toLowerCase();
   if (action === 'setup') return jsonResponse(setupSheet_());
-  if (action === 'admin_list') return jsonResponse({ products: listProducts_(true) });
-  return jsonResponse({ products: listProducts_(false), generated_at: new Date().toISOString() });
+  if (action === 'admin_list') return jsonResponse({ products: listProducts_(true), tipo_cambio: getTipoCambio_() });
+  return jsonResponse({ products: listProducts_(false), generated_at: new Date().toISOString(), tipo_cambio: getTipoCambio_() });
 }
 
 function doPost(e) {
@@ -81,7 +86,7 @@ function doPost(e) {
     const body = parseBody_(e);
     const action = String(body.action || '').toLowerCase();
 
-    if (['uploadimage', 'upsert', 'delete', 'toggleactive'].indexOf(action) !== -1) {
+    if (['uploadimage', 'upsert', 'delete', 'toggleactive', 'settipocambio'].indexOf(action) !== -1) {
       checkToken_(body);
     }
 
@@ -89,6 +94,7 @@ function doPost(e) {
     if (action === 'upsert') return jsonResponse(upsertProduct_(body.product || body));
     if (action === 'delete') return jsonResponse(deleteProduct_(body.id));
     if (action === 'toggleactive') return jsonResponse(toggleActive_(body.id, body.activo));
+    if (action === 'settipocambio') return jsonResponse(setTipoCambio_(body.valor));
     // Accion publica (sin token): el catalogo registra el pedido del cliente
     // justo antes de abrir WhatsApp, para que quede constancia en la hoja.
     if (action === 'registrarpedido') return jsonResponse(registrarPedido_(body));
@@ -104,6 +110,23 @@ function checkToken_(body) {
   if (String(body.token || '') !== ADMIN_TOKEN) {
     throw new Error('Token de administrador invalido o ausente.');
   }
+}
+
+/** Lee el tipo de cambio guardado. Devuelve null si nunca se configuro. */
+function getTipoCambio_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(TC_PROPERTY_KEY);
+  const value = Number(raw);
+  return raw && Number.isFinite(value) ? value : null;
+}
+
+/** Guarda el tipo de cambio (protegido por ADMIN_TOKEN, igual que upsert/delete). */
+function setTipoCambio_(valor) {
+  const value = Number(valor);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('Tipo de cambio invalido.');
+  }
+  PropertiesService.getScriptProperties().setProperty(TC_PROPERTY_KEY, String(value));
+  return { ok: true, tipo_cambio: value };
 }
 
 function setupSheet_() {
