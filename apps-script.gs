@@ -67,6 +67,7 @@ const HEADERS = [
   'categoria',
   'medida',
   'precio',
+  'moneda',
   'cantidad_stock',
   'imagen_url',
   'updated_at'

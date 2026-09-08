@@ -384,10 +384,17 @@ function actualizarIconoCarrito() {
   else el.classList.remove('visible');
 }
 
+// Si el carrito mezcla productos en USD y BOB, el total no se puede sumar en
+// una sola moneda con sentido: se avisa en vez de mostrar un numero erroneo.
+function monedaCarrito(items){
+  const monedas = [...new Set(items.map(i => i.currency || 'BOB'))];
+  return monedas.length === 1 ? monedas[0] : 'MEZCLA ⚠';
+}
+
 function renderizarVentanaCarrito() {
   const container = document.getElementById('cartItemsContainer');
   const totalSumLabel = document.getElementById('cartTotalSum');
-  
+
   if(carrito.length === 0) {
     container.innerHTML = '<p style="text-align:center; color:var(--muted); padding: 2rem 0;">Tu carrito está vacío.</p>';
     totalSumLabel.textContent = '0.00 BOB';
@@ -402,7 +409,7 @@ function renderizarVentanaCarrito() {
       <div class="cart-item">
         <div class="cart-item-info">
           <div class="cart-item-name">${item.name}</div>
-          <div class="cart-item-price">Precio unitario: ${fmt(item.price)} BOB</div>
+          <div class="cart-item-price">Precio unitario: ${fmt(item.price)} ${item.currency}</div>
         </div>
         <div style="display:flex; align-items:center; gap: 1rem;">
           <div class="cart-item-qty">
@@ -410,13 +417,13 @@ function renderizarVentanaCarrito() {
             <span style="font-weight:600; min-width: 20px; text-align:center;">${item.cantidad}</span>
             <button onclick="cambiarCantidad('${item.id}', 1)">+</button>
           </div>
-          <div class="cart-item-total">${fmt(subtotal)} BOB</div>
+          <div class="cart-item-total">${fmt(subtotal)} ${item.currency}</div>
         </div>
       </div>
     `;
   }).join('');
-  
-  totalSumLabel.textContent = fmt(totalVenta) + ' BOB';
+
+  totalSumLabel.textContent = fmt(totalVenta) + ' ' + monedaCarrito(carrito);
 }
 
 function abrirCarrito() {
@@ -443,9 +450,9 @@ function enviarPedidoPorWhatsApp() {
     const sub = item.price * item.cantidad;
     total += sub;
     const codigo = item.oem ? ` [OEM ${item.oem}]` : '';
-    mensaje += `- ${item.cantidad}x ${item.name}${codigo} (${fmt(sub)} BOB)\n`;
+    mensaje += `- ${item.cantidad}x ${item.name}${codigo} (${fmt(sub)} ${item.currency})\n`;
   });
-  mensaje += `\n*TOTAL: ${fmt(total)} BOB*`;
+  mensaje += `\n*TOTAL: ${fmt(total)} ${monedaCarrito(carrito)}*`;
 
   registrarPedidoEnHoja(total);
 
@@ -569,6 +576,10 @@ function normalizeProducts(rows){
       description: text(raw.descripcion || raw.description),
       measure: text(raw.medida || raw.medidas || raw.measure),
       price: number(raw.precio || raw.price, 0),
+      // La moneda se carga tal cual desde el Admin (sin conversion). Si se
+      // mezclan productos en USD y BOB en el carrito, el total no los suma
+      // correctamente: es responsabilidad de cargar todo en la misma moneda.
+      currency: text(raw.moneda || raw.currency).toUpperCase() === 'USD' ? 'USD' : 'BOB',
       stock,
       cat: canonicalCategory(raw.categoria || raw.cat, name),
       imageUrl: driveImg(text(raw.imagen_url || raw.image_url || raw.imagen)),
@@ -753,7 +764,7 @@ function renderProducts(){
         ${p.measure ? `<div class="card-measure">Medida: ${escapeHTML(p.measure)}</div>` : ''}
         ${p.description ? `<div class="card-description">${escapeHTML(p.description)}</div>` : ''}
         <div class="card-price-row">
-          <div class="card-price">${fmt(p.price)}<small>BOB</small></div>
+          <div class="card-price">${fmt(p.price)}<small>${p.currency}</small></div>
         </div>
         <div class="stock-wrap ${stock.className}">
           <div class="stock-track"><div class="stock-fill" style="width:${stock.bar}%"></div></div>
@@ -782,7 +793,7 @@ function openModal(id){
   ].filter(([,v]) => v);
   document.getElementById('modalSpecs').innerHTML=specs.map(([k,v])=>
     `<div class="spec-item"><span class="spec-key">${escapeHTML(k)}</span><span class="spec-val">${escapeHTML(v)}</span></div>`).join('');
-  document.getElementById('modalPrice').innerHTML=fmt(p.price)+' <small>BOB</small>';
+  document.getElementById('modalPrice').innerHTML=fmt(p.price)+' <small>'+p.currency+'</small>';
   addBtn.disabled = p.stock <= 0;
   addBtn.textContent = p.stock <= 0 ? 'AGOTADO' : '+ Agregar al Carrito';
   addBtn.onclick=()=>{agregarAlCarrito(p.id);closeModal();};
