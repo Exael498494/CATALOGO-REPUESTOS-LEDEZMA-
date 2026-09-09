@@ -228,7 +228,6 @@ footer p{color:var(--muted);font-size:.8rem; margin-top: 1rem;}
     <input class="search-input" id="searchInput" type="text" placeholder="Buscar repuesto, código, medida…">
     <button class="search-btn" onclick="filterSearch()">🔍 Buscar</button>
     <div class="fx-rate" id="fxRate" style="display:none" title="Tipo de cambio de referencia (se edita desde el Admin)">
-      <span class="fx-icon">💵</span>
       <span class="fx-value" id="fxValue"></span>
     </div>
   </div>
@@ -517,7 +516,7 @@ function renderTipoCambio(valor){
     return;
   }
   TC_RATE = value;
-  el.textContent = `TC- 1 USD = ${value.toFixed(2)} BS`;
+  el.textContent = `TC - USD = ${value.toFixed(2)} Bs`;
   box.style.display = 'inline-flex';
 }
 
