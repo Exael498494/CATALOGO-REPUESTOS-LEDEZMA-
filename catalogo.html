@@ -113,6 +113,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.95);backdrop-
 .card-price-row{display:flex;align-items:center;justify-content:flex-end;margin-bottom:.6rem}
 .card-price{font-family:var(--mono);font-size:.95rem;font-weight:800;color:#fff;background:#12B76A;width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;line-height:1;box-shadow:0 8px 18px rgba(18,183,106,.25)}
 .card-price small{font-size:.56rem;color:rgba(255,255,255,.88);font-weight:700;margin-top:.18rem}
+.card-price-ref{font-family:var(--mono);font-size:.66rem;color:var(--muted);text-align:right;margin-bottom:.3rem}
 .stock-wrap{margin-top:auto}
 .stock-track{height:8px;background:#E5E7EB;border-radius:999px;overflow:hidden}
 .stock-fill{height:100%;width:0;border-radius:999px;transition:width .25s ease,background .25s ease}
@@ -153,6 +154,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.95);backdrop-
 .spec-val{font-family:var(--mono);font-size:.78rem;color:#2563EB;font-weight:600}
 .modal-price{font-family:var(--mono);font-size:1.6rem;font-weight:700;color:var(--red);margin-bottom:1rem}
 .modal-price small{font-size:.8rem;color:var(--muted);font-weight:500}
+.modal-price-ref{font-family:var(--mono);font-size:.78rem;color:var(--muted);font-weight:500;margin-top:.15rem}
 .modal-add{background:var(--red);color:#fff;border:none;width:100%;padding:.8rem;border-radius:6px;
   font-weight:700;font-size:.95rem;cursor:pointer;transition:background .2s}
 .modal-add:hover{background:var(--red-dark)}
@@ -350,6 +352,10 @@ const FALLBACK_PRODUCTS = [
 let PRODUCTS = [];
 let usingFallback = false;
 let fetchInFlight = false;
+// Tipo de cambio vigente (USD -> BOB), usado para calcular el precio en
+// dolares que se muestra en el catalogo. Los precios siempre se cargan y se
+// cobran en BOB; esto es solo para mostrar la referencia en USD.
+let TC_RATE = null;
 
 // ─── STATE Y FUNCIONES DEL CATÁLOGO ──────────────────────────────────────────
 let currentFilter='all', currentSearch='';
@@ -384,13 +390,6 @@ function actualizarIconoCarrito() {
   else el.classList.remove('visible');
 }
 
-// Si el carrito mezcla productos en USD y BOB, el total no se puede sumar en
-// una sola moneda con sentido: se avisa en vez de mostrar un numero erroneo.
-function monedaCarrito(items){
-  const monedas = [...new Set(items.map(i => i.currency || 'BOB'))];
-  return monedas.length === 1 ? monedas[0] : 'MEZCLA ⚠';
-}
-
 function renderizarVentanaCarrito() {
   const container = document.getElementById('cartItemsContainer');
   const totalSumLabel = document.getElementById('cartTotalSum');
@@ -409,7 +408,7 @@ function renderizarVentanaCarrito() {
       <div class="cart-item">
         <div class="cart-item-info">
           <div class="cart-item-name">${item.name}</div>
-          <div class="cart-item-price">Precio unitario: ${fmt(item.price)} ${item.currency}</div>
+          <div class="cart-item-price">Precio unitario: ${fmt(item.price)} BOB</div>
         </div>
         <div style="display:flex; align-items:center; gap: 1rem;">
           <div class="cart-item-qty">
@@ -417,13 +416,13 @@ function renderizarVentanaCarrito() {
             <span style="font-weight:600; min-width: 20px; text-align:center;">${item.cantidad}</span>
             <button onclick="cambiarCantidad('${item.id}', 1)">+</button>
           </div>
-          <div class="cart-item-total">${fmt(subtotal)} ${item.currency}</div>
+          <div class="cart-item-total">${fmt(subtotal)} BOB</div>
         </div>
       </div>
     `;
   }).join('');
 
-  totalSumLabel.textContent = fmt(totalVenta) + ' ' + monedaCarrito(carrito);
+  totalSumLabel.textContent = fmt(totalVenta) + ' BOB';
 }
 
 function abrirCarrito() {
@@ -450,9 +449,9 @@ function enviarPedidoPorWhatsApp() {
     const sub = item.price * item.cantidad;
     total += sub;
     const codigo = item.oem ? ` [OEM ${item.oem}]` : '';
-    mensaje += `- ${item.cantidad}x ${item.name}${codigo} (${fmt(sub)} ${item.currency})\n`;
+    mensaje += `- ${item.cantidad}x ${item.name}${codigo} (${fmt(sub)} BOB)\n`;
   });
-  mensaje += `\n*TOTAL: ${fmt(total)} ${monedaCarrito(carrito)}*`;
+  mensaje += `\n*TOTAL: ${fmt(total)} BOB*`;
 
   registrarPedidoEnHoja(total);
 
@@ -513,9 +512,11 @@ function renderTipoCambio(valor){
   const el = document.getElementById('fxValue');
   const value = Number(valor);
   if(!Number.isFinite(value) || value <= 0){
+    TC_RATE = null;
     box.style.display = 'none';
     return;
   }
+  TC_RATE = value;
   el.textContent = `TC- 1 USD = ${value.toFixed(2)} BS`;
   box.style.display = 'inline-flex';
 }
@@ -576,10 +577,10 @@ function normalizeProducts(rows){
       description: text(raw.descripcion || raw.description),
       measure: text(raw.medida || raw.medidas || raw.measure),
       price: number(raw.precio || raw.price, 0),
-      // La moneda se carga tal cual desde el Admin (sin conversion). Si se
-      // mezclan productos en USD y BOB en el carrito, el total no los suma
-      // correctamente: es responsabilidad de cargar todo en la misma moneda.
-      currency: text(raw.moneda || raw.currency).toUpperCase() === 'USD' ? 'USD' : 'BOB',
+      // El precio se carga y se cobra siempre en BOB. priceUSD es solo el
+      // equivalente de referencia, calculado con el TC vigente (TC_RATE); si
+      // el TC no esta configurado todavia, queda en null y no se muestra.
+      priceUSD: TC_RATE ? number(raw.precio || raw.price, 0) / TC_RATE : null,
       stock,
       cat: canonicalCategory(raw.categoria || raw.cat, name),
       imageUrl: driveImg(text(raw.imagen_url || raw.image_url || raw.imagen)),
@@ -704,6 +705,9 @@ async function loadProductsFromSheets(){
     const data = await res.json();
     const rows = Array.isArray(data) ? data : (data.products || []);
     if(!rows.length) throw new Error('La hoja no devolvio productos.');
+    // El TC se procesa antes de normalizar productos: el precio en USD de
+    // cada producto se calcula a partir de TC_RATE dentro de normalizeProducts.
+    renderTipoCambio(data.tipo_cambio);
     // Ya NO se filtra por categoria: se muestra todo producto activo que
     // venga de la hoja, sea cual sea su "categoria".
     PRODUCTS = normalizeProducts(rows);
@@ -711,7 +715,6 @@ async function loadProductsFromSheets(){
     syncCartWithCatalog();
     renderFilterTabs();
     renderProducts();
-    renderTipoCambio(data.tipo_cambio);
     setSyncStatus(`Sincronizado con Google Sheets: ${new Date().toLocaleTimeString('es-BO')}`);
   }catch(error){
     console.error(error);
@@ -763,8 +766,9 @@ function renderProducts(){
         ${(p.brand || p.origen) ? `<div class="card-meta">${[escapeHTML(p.brand), escapeHTML(p.origen)].filter(Boolean).join(' · ')}</div>` : ''}
         ${p.measure ? `<div class="card-measure">Medida: ${escapeHTML(p.measure)}</div>` : ''}
         ${p.description ? `<div class="card-description">${escapeHTML(p.description)}</div>` : ''}
+        ${p.priceUSD !== null ? `<div class="card-price-ref">Ref: ${fmt(p.price)} BOB</div>` : ''}
         <div class="card-price-row">
-          <div class="card-price">${fmt(p.price)}<small>${p.currency}</small></div>
+          <div class="card-price">${p.priceUSD !== null ? fmt(p.priceUSD) : fmt(p.price)}<small>${p.priceUSD !== null ? 'USD' : 'BOB'}</small></div>
         </div>
         <div class="stock-wrap ${stock.className}">
           <div class="stock-track"><div class="stock-fill" style="width:${stock.bar}%"></div></div>
@@ -793,7 +797,9 @@ function openModal(id){
   ].filter(([,v]) => v);
   document.getElementById('modalSpecs').innerHTML=specs.map(([k,v])=>
     `<div class="spec-item"><span class="spec-key">${escapeHTML(k)}</span><span class="spec-val">${escapeHTML(v)}</span></div>`).join('');
-  document.getElementById('modalPrice').innerHTML=fmt(p.price)+' <small>'+p.currency+'</small>';
+  document.getElementById('modalPrice').innerHTML = p.priceUSD !== null
+    ? fmt(p.priceUSD)+' <small>USD</small><div class="modal-price-ref">Ref: '+fmt(p.price)+' BOB</div>'
+    : fmt(p.price)+' <small>BOB</small>';
   addBtn.disabled = p.stock <= 0;
   addBtn.textContent = p.stock <= 0 ? 'AGOTADO' : '+ Agregar al Carrito';
   addBtn.onclick=()=>{agregarAlCarrito(p.id);closeModal();};
